@@ -1,9 +1,18 @@
-from flask import Flask
+from flask import Flask, request, jsonify
 import os
-from flask import request
-from flask import jsonify
 import requests
+import json
+from dotenv import load_dotenv
 from indexPrograms import indexDoc
+from kafka import KafkaProducer
+
+# Загрузка переменных окружения из .env файла
+load_dotenv()
+
+producer = KafkaProducer(
+    bootstrap_servers=[os.getenv('KAFKA_BROKER_HOST')],
+    value_serializer=lambda x: json.dumps(x).encode('utf-8')
+)
 
 app = Flask(__name__)
 
@@ -29,27 +38,49 @@ def download_file(url, filename):
 
 @app.route("/conditions", methods=['POST'])
 def handle_conditions():
+    app.logger.debug('Расчет требований для госпрограммы')
     if 'file' in request.files:
         file = request.files['file']
         filename = file.filename
         filepath = save_file(file, filename)
-        response = indexDoc(filepath)
-        return jsonify({'conditions': response})
-        # return jsonify({"message": "File uploaded successfully", "filepath": filepath})
+        app.logger.debug('Получен файл. Начало индексации данных')
+        try:
+            producer.send('getConditionsToProgram', value={"id": request.form['stateProgramId'], "file": filepath})
+        except Exception as e:
+            app.logger.error(f"Ошибка при отправке задачи в Celery: {e}")
+        return jsonify({'message': 'ok'})
 
-    elif 'url' in request.json:
-        url = request.json['url']
+    elif 'fileUrl' in request.form:
+        url = request.form['fileUrl']
         filename = url.split('/')[-1]
         try:
             filepath = download_file(url, filename)
-            response = indexDoc(filepath)
-            return jsonify({'conditions': response})
-            # return jsonify({"message": "File downloaded successfully", "filepath": filepath})
+            producer.send('getConditionsToProgram', value={"id": request.json['stateProgramId'], "file": filepath})
+            return jsonify({'message': 'ok'})
         except Exception as e:
             return jsonify({"error": str(e)}), 400
 
     else:
         return jsonify({"error": "No file or URL provided"}), 400
+
+@app.route("/extractData", methods=['POST'])
+def handle_extract_data():
+    if 'description' in request.json:
+        producer.send('getCompanyData', value={"id": request.json['companyId'], "description": request.json['description']})
+        return jsonify({'message': 'ok'})
+
+    else:
+        return jsonify({"error": "Описание не предоставлено"}), 400
+    
+@app.route("/chekCondition", methods=['POST'])
+def handle_check_condition():
+    if 'company' in request.json and 'condition' in request.json:
+        producer.send('checkCondition', value={"company": { 'id' : request.json['company']['id'], 'data': request.json['company']['data']}, "condition": { 'id' : request.json['condition']['id'], 'data': request.json['condition']['condition']}})
+        return jsonify({'message': 'ok'})
+
+    else:
+        return jsonify({"error": "Описание не предоставлено"}), 400
+
 
 if __name__ == '__main__':
     app.run(debug=True)
