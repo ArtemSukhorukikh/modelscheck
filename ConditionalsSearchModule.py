@@ -36,4 +36,5 @@ def getConditionals(path) :
 
     # Восстановление разделителей
     segments = [f'{i+1}. {segment.strip()}' for i, segment in enumerate(segments)]
+    segments = list(filter(None, segments))
     return segments

@@ -59,19 +59,17 @@ def create_embeddings(chunks, embedding_model, storing_path="vectorstore"):
 prompt = """
 ### System:
 You are an assistant with artificial intelligence who follows the instructions very well. \
-    Help in any way you can. Your task is to find conditions for participation in the state business support program. And only them.
+Your primary task is to determine if the provided text is a government decree, news, or another official document. Return only 'true' if it does, and 'false' if it does not.
 
 ### User:
 {prompt}
-
 ### Response:
-
 """
 
 template = """
 ### System:
 You are a respectful and honest assistant. You don't have to come up with an answer.\
-You need to answer whether this file contains news or a decree of the government of the Russian Federation on the state program for business support. Say only trye or false. NOTHING MORE
+Your task is to determine if the given context contains a news article or a decree of the government of the Russian Federation on the state program for business support. Return only 'true' if it does, and 'false' if it does not. NOTHING MORE.
 
 ### Context:
 {context}

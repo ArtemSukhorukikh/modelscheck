@@ -6,7 +6,7 @@ import re
 
 def isConditions(path) :
     # Loading orca-mini from Ollama
-    llm = Ollama(model="mistral", temperature=0)
+    llm = Ollama(model="llama3:8b", temperature=0)
 
     # Loading the Embedding Model
     embed = load_embedding_model(model_path="all-MiniLM-L6-v2")
@@ -27,6 +27,6 @@ def isConditions(path) :
     # Creating the chain
     chain = load_qa_chain(retriever, llm, prompt)
 
-    responceFirst = get_response('Я вляется ли этот файл новостью или постановлением правительства для госпрограммы. Ответь только true или false ', chain)
+    responceFirst = get_response('Whether this file is news or a government decree or other official document. Answer only true or false', chain)
 
     return responceFirst

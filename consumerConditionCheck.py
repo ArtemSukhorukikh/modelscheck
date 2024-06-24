@@ -6,6 +6,9 @@ from kafka import KafkaConsumer
 from dotenv import load_dotenv
 import requests
 
+import warnings
+warnings.filterwarnings('ignore')
+
 load_dotenv()
 
 consumer = KafkaConsumer(

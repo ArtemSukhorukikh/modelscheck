@@ -8,6 +8,9 @@ import requests
 import json
 import re
 
+import warnings
+warnings.filterwarnings('ignore')
+
 load_dotenv()
 
 consumer = KafkaConsumer(

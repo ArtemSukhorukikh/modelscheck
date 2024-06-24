@@ -5,6 +5,8 @@ import json
 from dotenv import load_dotenv
 from indexPrograms import indexDoc
 from kafka import KafkaProducer
+import time
+from requests.exceptions import ReadTimeout, ConnectionError, RequestException
 
 # Загрузка переменных окружения из .env файла
 load_dotenv()
@@ -25,16 +27,29 @@ def save_file(file, filename):
     file.save(filepath)
     return filepath
 
-def download_file(url, filename):
-    response = requests.get(url, stream=True)
-    if response.status_code == 200:
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        with open(filepath, 'wb') as f:
-            for chunk in response.iter_content(1024):
-                f.write(chunk)
-        return filepath
-    else:
-        raise Exception(f"Failed to download file from {url}")
+def download_file(url, filename, retries=3):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    for i in range(retries):
+        try:
+            response = requests.get(url, headers=headers, stream=True, timeout=60)  # Увеличьте время ожидания до 60 секунд
+            if response.status_code == 200:
+                filepath = os.path.join(UPLOAD_FOLDER, filename)
+                with open(filepath, 'wb') as f:
+                    for chunk in response.iter_content(1024):
+                        f.write(chunk)
+                return filepath
+            else:
+                raise Exception(f"Failed to download file from {url}, status code: {response.status_code}")
+        except (ReadTimeout, ConnectionError) as e:
+            if i < retries - 1:
+                time.sleep(5)  # Подождите перед повторной попыткой
+                continue
+            else:
+                raise Exception(f"Failed to download file from {url} after {retries} attempts. Error: {e}")
+        except RequestException as e:
+            raise Exception(f"An error occurred while requesting {url}: {e}")
 
 @app.route("/conditions", methods=['POST'])
 def handle_conditions():
@@ -55,7 +70,7 @@ def handle_conditions():
         filename = url.split('/')[-1]
         try:
             filepath = download_file(url, filename)
-            producer.send('getConditionsToProgram', value={"id": request.json['stateProgramId'], "file": filepath})
+            producer.send('getConditionsToProgram', value={"id": request.form['stateProgramId'], "file": filepath})
             return jsonify({'message': 'ok'})
         except Exception as e:
             return jsonify({"error": str(e)}), 400
